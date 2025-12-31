@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an MCP (Model Context Protocol) server that wraps the Sequence Banking API, enabling AI assistants to interact with Sequence financial accounts. It provides two tools: `get_accounts` (fetch account balances) and `trigger_rule` (invoke automation rules).
+**Unofficial** MCP (Model Context Protocol) server that wraps the Sequence Banking API, enabling AI assistants to interact with Sequence financial accounts. Not affiliated with Sequence.
+
+It provides two tools: `get_accounts` (fetch account balances) and `trigger_rule` (invoke automation rules).
 
 ## Development Commands
 
