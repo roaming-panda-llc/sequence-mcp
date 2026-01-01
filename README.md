@@ -1,5 +1,7 @@
 # Sequence Banking MCP Server
 
+[![CI](https://github.com/markng/sequence-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/markng/sequence-mcp/actions/workflows/ci.yml)
+
 > **⚠️ UNOFFICIAL:** This is an unofficial, community-built MCP server. It is not affiliated with, endorsed by, or supported by Sequence.
 
 An MCP (Model Context Protocol) server that provides access to the [Sequence](https://getsequence.io) banking API. This allows AI assistants like Claude to interact with your Sequence accounts programmatically.
