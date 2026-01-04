@@ -109,12 +109,34 @@ Triggers an automation rule in Sequence.
 
 ## Development
 
+### Setup
+
+```bash
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install development dependencies (includes testing tools)
+pip install -e ".[dev]"
+```
+
 ### Running Tests
 
 ```bash
-source venv/bin/activate
+# Run all tests
 pytest -v
+
+# Run with coverage report
+pytest --cov=sequence_mcp
+
+# Run specific test file
+pytest tests/test_client.py -v
+
+# Run specific test function
+pytest tests/test_client.py::describe_SequenceClient::describe_get_accounts -v
 ```
+
+Tests use `pytest-describe` for BDD-style organization and `respx` for HTTP mocking.
 
 ### Project Structure
 
