@@ -1,7 +1,9 @@
 """MCP server for the Sequence Banking API."""
 
 import os
+import sys
 import json
+import logging
 from typing import Any
 
 from mcp.server import Server
@@ -11,6 +13,14 @@ from mcp.types import Tool, TextContent
 from .client import SequenceClient
 from .models import SequenceError
 
+# Configure logging to stderr so Claude Code can see errors
+# (stdout is reserved for MCP protocol messages)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stderr,
+)
+logger = logging.getLogger("sequence-mcp")
 
 server = Server("sequence-banking")
 
@@ -74,14 +84,25 @@ async def list_tools() -> list[Tool]:
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle tool calls."""
+    logger.info("Tool called: %s with arguments: %s", name, arguments)
     try:
         if name == "get_accounts":
-            return await handle_get_accounts()
+            result = await handle_get_accounts()
         elif name == "trigger_rule":
-            return await handle_trigger_rule(arguments)
+            result = await handle_trigger_rule(arguments)
         else:
+            logger.warning("Unknown tool requested: %s", name)
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
+        logger.debug("Tool %s completed successfully", name)
+        return result
     except SequenceError as e:
+        logger.error(
+            "SequenceError in %s: code=%s, message=%s, status=%s",
+            name,
+            e.code,
+            e.message,
+            e.status_code,
+        )
         return [
             TextContent(
                 type="text",
@@ -96,6 +117,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             )
         ]
     except Exception as e:
+        logger.exception("Unexpected error in tool %s: %s", name, e)
         return [
             TextContent(
                 type="text",
@@ -183,15 +205,35 @@ async def handle_trigger_rule(arguments: dict[str, Any]) -> list[TextContent]:
 
 async def main():
     """Run the MCP server."""
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            server.create_initialization_options(),
-        )
+    logger.info("Starting Sequence MCP server...")
+
+    # Log environment status (without exposing secrets)
+    access_token = get_access_token()
+    if access_token:
+        logger.info("SEQUENCE_ACCESS_TOKEN is set (%d chars)", len(access_token))
+    else:
+        logger.warning("SEQUENCE_ACCESS_TOKEN is not set - get_accounts will fail")
+
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            logger.info("MCP stdio server started, awaiting requests...")
+            await server.run(
+                read_stream,
+                write_stream,
+                server.create_initialization_options(),
+            )
+    except Exception as e:
+        logger.exception("MCP server error: %s", e)
+        raise
 
 
 if __name__ == "__main__":
     import asyncio
 
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Server stopped by user")
+    except Exception as e:
+        logger.exception("Fatal error starting server: %s", e)
+        sys.exit(1)
