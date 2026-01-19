@@ -287,3 +287,21 @@ def describe_SequenceClient():
             assert client._client is not None
             await client.close()
             assert client._client is None
+
+        @pytest.mark.asyncio
+        async def it_handles_exit_when_client_is_none():
+            """Test __aexit__ when _client was never initialized."""
+            client = SequenceClient(access_token="test")
+            assert client._client is None
+            # Manually call __aexit__ without __aenter__
+            await client.__aexit__(None, None, None)
+            assert client._client is None
+
+        @pytest.mark.asyncio
+        async def it_handles_close_when_client_is_none():
+            """Test close() when _client was never initialized."""
+            client = SequenceClient(access_token="test")
+            assert client._client is None
+            # Should not raise any errors
+            await client.close()
+            assert client._client is None

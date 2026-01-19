@@ -33,6 +33,18 @@ testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
 addopts = "--cov=sequence_mcp --cov-report=term-missing --cov-fail-under=100"
 
+[tool.coverage.run]
+branch = true
+source = ["sequence_mcp"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "def main\\(\\):",
+    "async def main\\(\\):",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["sequence_mcp*"]
