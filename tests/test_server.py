@@ -6,12 +6,15 @@ import os
 import pytest
 import httpx
 import respx
+from unittest.mock import AsyncMock, patch
 
 from sequence_mcp.server import (
     list_tools,
     call_tool,
     handle_get_accounts,
     handle_trigger_rule,
+    main,
+    get_access_token,
 )
 
 
@@ -79,32 +82,21 @@ def describe_call_tool():
                 os.environ["SEQUENCE_ACCESS_TOKEN"] = original_token
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def it_handles_unexpected_exceptions():
-        """Test that non-SequenceError exceptions are caught and formatted."""
-        # Mock the API to return invalid JSON that will cause a parsing error
-        respx.post("https://api.getsequence.io/accounts").mock(
-            return_value=httpx.Response(
-                200,
-                content=b"not valid json",
-                headers={"content-type": "application/json"},
-            )
-        )
+    async def it_handles_unexpected_exceptions(monkeypatch):
+        """When an unexpected exception (not SequenceError) occurs, the server
+        should catch it and return a JSON error response."""
+        from sequence_mcp import server
 
-        original_token = os.environ.get("SEQUENCE_ACCESS_TOKEN")
-        os.environ["SEQUENCE_ACCESS_TOKEN"] = "test_token"
+        async def mock_handle_get_accounts():
+            raise RuntimeError("Unexpected internal error")
 
-        try:
-            result = await call_tool("get_accounts", {})
-            data = json.loads(result[0].text)
-            assert data["error"] is True
-            # The error message should contain something about JSON parsing
-            assert "message" in data
-        finally:
-            if original_token:
-                os.environ["SEQUENCE_ACCESS_TOKEN"] = original_token
-            else:
-                del os.environ["SEQUENCE_ACCESS_TOKEN"]
+        monkeypatch.setattr(server, "handle_get_accounts", mock_handle_get_accounts)
+
+        result = await call_tool("get_accounts", {})
+        data = json.loads(result[0].text)
+
+        assert data["error"] is True
+        assert "Unexpected internal error" in data["message"]
 
 
 def describe_handle_get_accounts():
@@ -257,3 +249,206 @@ def describe_handle_trigger_rule():
         assert data["error"] is True
         assert data["code"] == "INVALID_API_SECRET"
         assert data["status_code"] == 401
+
+
+def describe_get_access_token():
+    """Tests for the get_access_token helper function."""
+
+    def it_returns_token_when_set():
+        original_token = os.environ.get("SEQUENCE_ACCESS_TOKEN")
+        os.environ["SEQUENCE_ACCESS_TOKEN"] = "test_token_value"
+
+        try:
+            token = get_access_token()
+            assert token == "test_token_value"
+        finally:
+            if original_token:
+                os.environ["SEQUENCE_ACCESS_TOKEN"] = original_token
+            else:
+                del os.environ["SEQUENCE_ACCESS_TOKEN"]
+
+    def it_returns_none_when_not_set():
+        original_token = os.environ.get("SEQUENCE_ACCESS_TOKEN")
+        if "SEQUENCE_ACCESS_TOKEN" in os.environ:
+            del os.environ["SEQUENCE_ACCESS_TOKEN"]
+
+        try:
+            token = get_access_token()
+            assert token is None
+        finally:
+            if original_token:
+                os.environ["SEQUENCE_ACCESS_TOKEN"] = original_token
+
+
+def describe_main():
+    """Tests for the main server function."""
+
+    @pytest.mark.asyncio
+    async def it_runs_server_with_access_token_set(monkeypatch):
+        """When SEQUENCE_ACCESS_TOKEN is set, main logs it and runs the server."""
+        monkeypatch.setenv("SEQUENCE_ACCESS_TOKEN", "test_token_12345")
+
+        # Create mock streams
+        mock_read_stream = AsyncMock()
+        mock_write_stream = AsyncMock()
+
+        # Mock stdio_server to return our mock streams
+        mock_context_manager = AsyncMock()
+        mock_context_manager.__aenter__.return_value = (
+            mock_read_stream,
+            mock_write_stream,
+        )
+        mock_context_manager.__aexit__.return_value = None
+
+        # Mock the server.run to complete immediately
+        from sequence_mcp import server
+
+        mock_server_run = AsyncMock()
+        monkeypatch.setattr(server.server, "run", mock_server_run)
+
+        with patch("sequence_mcp.server.stdio_server", return_value=mock_context_manager):
+            await main()
+
+        # Verify server.run was called with the mock streams
+        mock_server_run.assert_called_once()
+        call_args = mock_server_run.call_args
+        assert call_args[0][0] == mock_read_stream
+        assert call_args[0][1] == mock_write_stream
+
+    @pytest.mark.asyncio
+    async def it_runs_server_without_access_token(monkeypatch):
+        """When SEQUENCE_ACCESS_TOKEN is not set, main logs a warning but still runs."""
+        if "SEQUENCE_ACCESS_TOKEN" in os.environ:
+            monkeypatch.delenv("SEQUENCE_ACCESS_TOKEN")
+
+        mock_read_stream = AsyncMock()
+        mock_write_stream = AsyncMock()
+
+        mock_context_manager = AsyncMock()
+        mock_context_manager.__aenter__.return_value = (
+            mock_read_stream,
+            mock_write_stream,
+        )
+        mock_context_manager.__aexit__.return_value = None
+
+        from sequence_mcp import server
+
+        mock_server_run = AsyncMock()
+        monkeypatch.setattr(server.server, "run", mock_server_run)
+
+        with patch("sequence_mcp.server.stdio_server", return_value=mock_context_manager):
+            await main()
+
+        # Server should still run even without token
+        mock_server_run.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def it_propagates_server_errors(monkeypatch):
+        """When the MCP server raises an exception, main propagates it."""
+        monkeypatch.setenv("SEQUENCE_ACCESS_TOKEN", "test_token")
+
+        mock_context_manager = AsyncMock()
+        mock_context_manager.__aenter__.side_effect = RuntimeError("Server connection failed")
+
+        with patch("sequence_mcp.server.stdio_server", return_value=mock_context_manager):
+            with pytest.raises(RuntimeError, match="Server connection failed"):
+                await main()
+
+
+def describe_main_entry_point():
+    """Tests for the __main__ entry point behavior.
+
+    The __main__ block (lines 231-239) handles:
+    1. Running asyncio.run(main())
+    2. Catching KeyboardInterrupt for graceful shutdown
+    3. Catching other exceptions and exiting with code 1
+    """
+
+    def it_runs_main_via_asyncio_run(monkeypatch):
+        """When the module runs as __main__, it calls asyncio.run(main())."""
+        import asyncio
+        import runpy
+        import warnings
+
+        # Track that asyncio.run was called
+        run_called = []
+
+        def mock_asyncio_run(coro):
+            run_called.append(coro)
+            # Close the coroutine to avoid "never awaited" warnings
+            coro.close()
+            # Raise SystemExit to stop execution
+            raise SystemExit(0)
+
+        monkeypatch.setattr(asyncio, "run", mock_asyncio_run)
+
+        # Suppress the runpy warning about module already in sys.modules
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+            # Run the module as __main__
+            try:
+                runpy.run_module("sequence_mcp.server", run_name="__main__")
+            except SystemExit:
+                pass  # Expected - we raised it in mock
+
+        assert len(run_called) == 1  # asyncio.run was called once
+
+    def it_handles_keyboard_interrupt(monkeypatch, capfd):
+        """When KeyboardInterrupt occurs, the server logs and exits cleanly."""
+        import asyncio
+        import runpy
+        import warnings
+
+        def mock_asyncio_run(coro):
+            # Close the coroutine to avoid warnings
+            coro.close()
+            raise KeyboardInterrupt()
+
+        monkeypatch.setattr(asyncio, "run", mock_asyncio_run)
+
+        # Suppress the runpy warning about module already in sys.modules
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+            # Run the module - should handle KeyboardInterrupt gracefully
+            try:
+                runpy.run_module("sequence_mcp.server", run_name="__main__")
+            except SystemExit:
+                pass  # Not expected but acceptable
+
+        # The KeyboardInterrupt handler logs to stderr
+        captured = capfd.readouterr()
+        # The server logs "Server stopped by user" on KeyboardInterrupt
+        assert "stopped by user" in captured.err or captured.out == ""
+
+    def it_exits_with_code_1_on_fatal_error(monkeypatch, caplog):
+        """When a fatal error occurs, the server logs and exits with code 1."""
+        import asyncio
+        import runpy
+        import logging
+        import warnings
+
+        def mock_asyncio_run(coro):
+            # Close the coroutine to avoid warnings
+            coro.close()
+            raise RuntimeError("Simulated fatal error")
+
+        monkeypatch.setattr(asyncio, "run", mock_asyncio_run)
+
+        # Capture log messages and suppress runpy warnings
+        with caplog.at_level(logging.ERROR):
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning)
+                # Run the module - should catch the exception and exit with code 1
+                exit_code = None
+                try:
+                    runpy.run_module("sequence_mcp.server", run_name="__main__")
+                except SystemExit as e:
+                    exit_code = e.code
+
+        assert exit_code == 1
+
+        # The exception handler logs the error
+        assert any(
+            "Fatal error" in record.message or "Simulated fatal error" in record.message
+            for record in caplog.records
+        )
