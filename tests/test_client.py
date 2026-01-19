@@ -247,6 +247,29 @@ def describe_SequenceClient():
             assert exc_info.value.code == "INVALID_REQUEST"
             assert exc_info.value.status_code == 400
 
+    def describe_error_handling():
+        """Tests for error response handling."""
+
+        @pytest.mark.asyncio
+        @respx.mock
+        async def it_handles_non_json_error_response():
+            """Test handling of error response with non-JSON body."""
+            respx.post("https://api.getsequence.io/accounts").mock(
+                return_value=httpx.Response(
+                    500,
+                    content=b"Internal Server Error",
+                    headers={"content-type": "text/plain"},
+                )
+            )
+
+            async with SequenceClient(access_token="test_token") as client:
+                with pytest.raises(SequenceError) as exc_info:
+                    await client.get_accounts()
+
+            assert exc_info.value.code == "HTTP_ERROR"
+            assert "500" in exc_info.value.message
+            assert exc_info.value.status_code == 500
+
     def describe_context_manager():
         """Tests for async context manager behavior."""
 
@@ -262,5 +285,23 @@ def describe_SequenceClient():
             client = SequenceClient(access_token="test")
             client._get_client()  # Initialize the internal client
             assert client._client is not None
+            await client.close()
+            assert client._client is None
+
+        @pytest.mark.asyncio
+        async def it_handles_exit_when_client_is_none():
+            """Test __aexit__ when _client was never initialized."""
+            client = SequenceClient(access_token="test")
+            assert client._client is None
+            # Manually call __aexit__ without __aenter__
+            await client.__aexit__(None, None, None)
+            assert client._client is None
+
+        @pytest.mark.asyncio
+        async def it_handles_close_when_client_is_none():
+            """Test close() when _client was never initialized."""
+            client = SequenceClient(access_token="test")
+            assert client._client is None
+            # Should not raise any errors
             await client.close()
             assert client._client is None
