@@ -77,6 +77,34 @@ def describe_call_tool():
             if original_token:
                 os.environ["SEQUENCE_ACCESS_TOKEN"] = original_token
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def it_handles_unexpected_exceptions():
+        """Test that non-SequenceError exceptions are caught and formatted."""
+        # Mock the API to return invalid JSON that will cause a parsing error
+        respx.post("https://api.getsequence.io/accounts").mock(
+            return_value=httpx.Response(
+                200,
+                content=b"not valid json",
+                headers={"content-type": "application/json"},
+            )
+        )
+
+        original_token = os.environ.get("SEQUENCE_ACCESS_TOKEN")
+        os.environ["SEQUENCE_ACCESS_TOKEN"] = "test_token"
+
+        try:
+            result = await call_tool("get_accounts", {})
+            data = json.loads(result[0].text)
+            assert data["error"] is True
+            # The error message should contain something about JSON parsing
+            assert "message" in data
+        finally:
+            if original_token:
+                os.environ["SEQUENCE_ACCESS_TOKEN"] = original_token
+            else:
+                del os.environ["SEQUENCE_ACCESS_TOKEN"]
+
 
 def describe_handle_get_accounts():
     """Tests for the get_accounts handler."""

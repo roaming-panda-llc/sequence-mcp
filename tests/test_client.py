@@ -247,6 +247,29 @@ def describe_SequenceClient():
             assert exc_info.value.code == "INVALID_REQUEST"
             assert exc_info.value.status_code == 400
 
+    def describe_error_handling():
+        """Tests for error response handling."""
+
+        @pytest.mark.asyncio
+        @respx.mock
+        async def it_handles_non_json_error_response():
+            """When API returns non-JSON error, fall back to HTTP error details."""
+            respx.post("https://api.getsequence.io/accounts").mock(
+                return_value=httpx.Response(
+                    500,
+                    content=b"Internal Server Error",
+                    headers={"content-type": "text/plain"},
+                )
+            )
+
+            async with SequenceClient(access_token="test_token") as client:
+                with pytest.raises(SequenceError) as exc_info:
+                    await client.get_accounts()
+
+            assert exc_info.value.code == "HTTP_ERROR"
+            assert "HTTP 500" in exc_info.value.message
+            assert exc_info.value.status_code == 500
+
     def describe_context_manager():
         """Tests for async context manager behavior."""
 
