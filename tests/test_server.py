@@ -358,7 +358,7 @@ def describe_main():
 def describe_main_entry_point():
     """Tests for the __main__ entry point behavior.
 
-    The __main__ block (lines 231-239) handles:
+    The __main__ block (lines 230-239) handles:
     1. Running asyncio.run(main())
     2. Catching KeyboardInterrupt for graceful shutdown
     3. Catching other exceptions and exiting with code 1
@@ -418,7 +418,8 @@ def describe_main_entry_point():
         # The KeyboardInterrupt handler logs to stderr
         captured = capfd.readouterr()
         # The server logs "Server stopped by user" on KeyboardInterrupt
-        assert "stopped by user" in captured.err or captured.out == ""
+        message = "stopped by user"
+        assert message in captured.err.lower() or message in captured.out.lower()
 
     def it_exits_with_code_1_on_fatal_error(monkeypatch, caplog):
         """When a fatal error occurs, the server logs and exits with code 1."""
