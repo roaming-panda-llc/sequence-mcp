@@ -393,10 +393,11 @@ def describe_main_entry_point():
 
         assert len(run_called) == 1  # asyncio.run was called once
 
-    def it_handles_keyboard_interrupt(monkeypatch, capfd):
+    def it_handles_keyboard_interrupt(monkeypatch, caplog):
         """When KeyboardInterrupt occurs, the server logs and exits cleanly."""
         import asyncio
         import runpy
+        import logging
         import warnings
 
         def mock_asyncio_run(coro):
@@ -406,20 +407,21 @@ def describe_main_entry_point():
 
         monkeypatch.setattr(asyncio, "run", mock_asyncio_run)
 
-        # Suppress the runpy warning about module already in sys.modules
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=RuntimeWarning)
-            # Run the module - should handle KeyboardInterrupt gracefully
-            try:
-                runpy.run_module("sequence_mcp.server", run_name="__main__")
-            except SystemExit:
-                pass  # Not expected but acceptable
+        # Capture log messages and suppress runpy warnings
+        with caplog.at_level(logging.INFO):
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning)
+                # Run the module - should handle KeyboardInterrupt gracefully
+                try:
+                    runpy.run_module("sequence_mcp.server", run_name="__main__")
+                except SystemExit:
+                    pass  # Not expected but acceptable
 
-        # The KeyboardInterrupt handler logs to stderr
-        captured = capfd.readouterr()
-        # The server logs "Server stopped by user" on KeyboardInterrupt
-        message = "stopped by user"
-        assert message in captured.err.lower() or message in captured.out.lower()
+        # The KeyboardInterrupt handler logs "Server stopped by user"
+        assert any(
+            "stopped by user" in record.message.lower()
+            for record in caplog.records
+        )
 
     def it_exits_with_code_1_on_fatal_error(monkeypatch, caplog):
         """When a fatal error occurs, the server logs and exits with code 1."""
