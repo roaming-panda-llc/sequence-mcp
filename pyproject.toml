@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
     "pytest-describe>=2.0.0",
     "pytest-asyncio>=0.23.0",
     "respx>=0.20.0",
@@ -30,6 +31,7 @@ sequence-mcp = "sequence_mcp.server:main"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
+addopts = "--cov=sequence_mcp --cov-report=term-missing --cov-fail-under=100"
 
 [tool.setuptools.packages.find]
 where = ["."]

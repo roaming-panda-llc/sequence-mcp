@@ -1,6 +1,7 @@
 # Sequence Banking MCP Server
 
 [![CI](https://github.com/markng/sequence-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/markng/sequence-mcp/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/markng/sequence-mcp/graph/badge.svg)](https://codecov.io/gh/markng/sequence-mcp)
 
 > **⚠️ UNOFFICIAL:** This is an unofficial, community-built MCP server. It is not affiliated with, endorsed by, or supported by Sequence.
 
