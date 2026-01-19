@@ -26,7 +26,7 @@ jobs:
         run: pip install pip-audit
 
       - name: Security audit
-        run: pip-audit --require-hashes=false --progress-spinner=off
+        run: pip-audit --progress-spinner off
 
       - name: Run tests with coverage
         run: |
