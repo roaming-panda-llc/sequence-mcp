@@ -203,7 +203,7 @@ async def handle_trigger_rule(arguments: dict[str, Any]) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
 
-async def main():
+async def main():  # pragma: no cover
     """Run the MCP server."""
     logger.info("Starting Sequence MCP server...")
 
@@ -227,7 +227,7 @@ async def main():
         raise
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     import asyncio
 
     try:

@@ -253,7 +253,7 @@ def describe_SequenceClient():
         @pytest.mark.asyncio
         @respx.mock
         async def it_handles_non_json_error_response():
-            """Test handling of error response with non-JSON body."""
+            """When API returns non-JSON error, fall back to HTTP error details."""
             respx.post("https://api.getsequence.io/accounts").mock(
                 return_value=httpx.Response(
                     500,
@@ -267,7 +267,7 @@ def describe_SequenceClient():
                     await client.get_accounts()
 
             assert exc_info.value.code == "HTTP_ERROR"
-            assert "500" in exc_info.value.message
+            assert "HTTP 500" in exc_info.value.message
             assert exc_info.value.status_code == 500
 
     def describe_context_manager():
