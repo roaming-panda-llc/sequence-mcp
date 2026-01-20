@@ -1,4 +1,14 @@
-# GitHub Copilot Instructions
+# GitHub Copilot Code Review Instructions
+
+## Test Requirements
+
+### pytest-describe Pattern
+
+When using pytest-describe for test organization:
+- Test functions are nested functions with descriptive names (e.g., `it_calculates_tool_efficiency`)
+- These function names serve as test descriptions and are discovered by the pytest-describe framework
+- **Do not flag these nested functions as "unused variables"** - they are intentionally not called directly
+- The naming pattern follows BDD-style: `it_<describes_behavior>` or `describe_<feature>`
 
 ## pytest-describe Testing Pattern
 
