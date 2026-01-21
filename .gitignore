@@ -22,6 +22,8 @@ eggs/
 .coverage
 coverage.xml
 htmlcov/
+.mutmut-cache/
+mutants/
 
 # IDE
 .idea/
