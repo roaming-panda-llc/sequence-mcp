@@ -247,12 +247,34 @@ def describe_SequenceClient():
             assert exc_info.value.code == "INVALID_REQUEST"
             assert exc_info.value.status_code == 400
 
+        @pytest.mark.asyncio
+        @respx.mock
+        async def it_handles_non_json_error_response():
+            respx.post(
+                "https://api.getsequence.io/remote-api/rules/ru_test/trigger"
+            ).mock(
+                return_value=httpx.Response(
+                    500, content=b"Internal Server Error", headers={"content-type": "text/plain"}
+                )
+            )
+
+            async with SequenceClient() as client:
+                with pytest.raises(SequenceError) as exc_info:
+                    await client.trigger_rule(
+                        rule_id="ru_test",
+                        api_secret="secret",
+                    )
+
+            assert exc_info.value.code == "HTTP_ERROR"
+            assert "500" in exc_info.value.message
+            assert exc_info.value.status_code == 500
+
     def describe_error_handling():
         """Tests for error response handling."""
 
         @pytest.mark.asyncio
         @respx.mock
-        async def it_handles_non_json_error_response():
+        async def it_handles_non_json_error_response_for_accounts():
             """When API returns non-JSON error, fall back to HTTP error details."""
             respx.post("https://api.getsequence.io/accounts").mock(
                 return_value=httpx.Response(

@@ -22,6 +22,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Security audit
+        run: pip-audit --progress-spinner off
+
       - name: Run tests with coverage
         run: |
           pytest -v --tb=short --cov-report=xml
@@ -32,4 +38,3 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
           fail_ci_if_error: false
-          verbose: true
