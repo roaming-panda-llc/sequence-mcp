@@ -12,7 +12,7 @@ on:
 
 jobs:
   mutation:
-    uses: markng/agent_work/.github/workflows/mutation-testing-reusable.yml@main
+    uses: roaming-panda-llc/agent_work/.github/workflows/mutation-testing-reusable.yml@main
     with:
       source-paths: 'sequence_mcp/'
       python-version: '3.11'
