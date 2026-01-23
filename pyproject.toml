@@ -48,7 +48,3 @@ exclude_lines = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["sequence_mcp*"]
-
-[tool.mutmut]
-paths_to_mutate = "sequence_mcp/"
-tests_dir = "tests/"
