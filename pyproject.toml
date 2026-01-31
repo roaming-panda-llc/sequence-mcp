@@ -51,6 +51,12 @@ paths_to_mutate = "sequence_mcp/"
 tests_dir = "tests/"
 runner = "python -m pytest -x --assert=plain"
 
+[tool.ruff.lint]
+select = ["C901"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["sequence_mcp*"]
